@@ -1,0 +1,34 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+ai-env/
+venv/
+.venv/
+
+# AI model files
+*.pt
+*.onnx
+
+# AI datasets and training outputs
+datasets/
+runs/
+*.cache
+
+# Build output
+dist/
+build/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
