@@ -39,10 +39,7 @@ const menuItems = [
   {
     name: 'Corrective Actions',
     path: '/corrective-actions',
-    roles: [
-      'Mine Manager',
-      'Safety Officer',
-    ],
+    roles: ['Mine Manager', 'Safety Officer', 'Area Supervisor'],
   },
   {
     name: 'Re-inspections',

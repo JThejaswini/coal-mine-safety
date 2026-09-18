@@ -2,6 +2,7 @@ const express = require('express')
 
 const {
   getCorrectiveActions,
+  getEligibleSupervisors,
   createCorrectiveAction,
   completeCorrectiveAction,
 } = require('../controllers/correctiveActionController')
@@ -13,6 +14,8 @@ const router = express.Router()
 router.use(authenticateToken)
 
 router.get('/', getCorrectiveActions)
+
+router.get('/supervisors', getEligibleSupervisors)
 
 router.post('/', createCorrectiveAction)
 

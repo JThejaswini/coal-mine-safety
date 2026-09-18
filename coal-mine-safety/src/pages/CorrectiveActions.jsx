@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'react'
 
+const API = 'http://localhost:5000/api'
+
 function CorrectiveActions() {
   const [actions, setActions] = useState([])
   const [violations, setViolations] = useState([])
   const [reinspections, setReinspections] = useState([])
+
+  const [supervisors, setSupervisors] = useState([])
+  const [selectedViolation, setSelectedViolation] = useState(null)
+  const [selectedSupervisor, setSelectedSupervisor] = useState('')
+  const [showAssignForm, setShowAssignForm] = useState(false)
+
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   const token = localStorage.getItem('token')
+  const role = localStorage.getItem('userRole')
+
+  const isSupervisor = role === 'Area Supervisor'
+  const canCreate =
+    role === 'Safety Officer' || role === 'Mine Manager'
 
   const fetchData = async () => {
     try {
@@ -17,50 +30,31 @@ function CorrectiveActions() {
         Authorization: `Bearer ${token}`,
       }
 
-      const [
-        actionsResponse,
-        violationsResponse,
-        reinspectionsResponse,
-      ] = await Promise.all([
-        fetch(
-          'http://localhost:5000/api/corrective-actions',
-          { headers }
-        ),
-        fetch(
-          'http://localhost:5000/api/violations',
-          { headers }
-        ),
-        fetch(
-          'http://localhost:5000/api/reinspections',
-          { headers }
-        ),
-      ])
+      const [actionsRes, violationsRes, reinspectionsRes] =
+        await Promise.all([
+          fetch(`${API}/corrective-actions`, { headers }),
+          fetch(`${API}/violations`, { headers }),
+          fetch(`${API}/reinspections`, { headers }),
+        ])
 
-      const actionsData =
-        await actionsResponse.json()
+      const actionsData = await actionsRes.json()
+      const violationsData = await violationsRes.json()
+      const reinspectionsData = await reinspectionsRes.json()
 
-      const violationsData =
-        await violationsResponse.json()
-
-      const reinspectionsData =
-        await reinspectionsResponse.json()
-
-      if (
-        !actionsResponse.ok ||
-        !violationsResponse.ok ||
-        !reinspectionsResponse.ok
-      ) {
-        throw new Error(
-          'Failed to load corrective action data'
-        )
+      if (actionsRes.ok) {
+        setActions(actionsData)
       }
 
-      setActions(actionsData)
-      setViolations(violationsData)
-      setReinspections(reinspectionsData)
+      if (violationsRes.ok) {
+        setViolations(violationsData)
+      }
+
+      if (reinspectionsRes.ok) {
+        setReinspections(reinspectionsData)
+      }
     } catch (error) {
       console.error(error)
-      setError(error.message)
+      setMessage('Failed to load corrective actions')
     } finally {
       setLoading(false)
     }
@@ -70,10 +64,47 @@ function CorrectiveActions() {
     fetchData()
   }, [])
 
-  const createAction = async (violation) => {
+  const openAssignForm = async (violation) => {
+    try {
+      setMessage('')
+      setSelectedViolation(violation)
+      setSelectedSupervisor('')
+      setShowAssignForm(true)
+
+      const response = await fetch(
+        `${API}/corrective-actions/supervisors?violationId=${violation.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setMessage(data.message || 'Failed to load supervisors')
+        setSupervisors([])
+        return
+      }
+
+      setSupervisors(data)
+    } catch (error) {
+      console.error(error)
+      setMessage('Failed to load supervisors')
+      setSupervisors([])
+    }
+  }
+
+  const createAction = async () => {
+    if (!selectedViolation || !selectedSupervisor) {
+      setMessage('Please select an Area Supervisor')
+      return
+    }
+
     try {
       const response = await fetch(
-        'http://localhost:5000/api/corrective-actions',
+        `${API}/corrective-actions`,
         {
           method: 'POST',
           headers: {
@@ -81,9 +112,10 @@ function CorrectiveActions() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            violationId: violation.id,
+            violationId: selectedViolation.id,
+            assignedTo: Number(selectedSupervisor),
             actionDescription:
-              `Correct ${violation.type} at ${violation.zone}`,
+              `Correct ${selectedViolation.type} at ${selectedViolation.zone}`,
             deadline: '2026-09-15',
           }),
         }
@@ -92,23 +124,26 @@ function CorrectiveActions() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to create corrective action'
-        )
+        setMessage(data.message || 'Failed to create action')
+        return
       }
+
+      setMessage('Corrective action assigned successfully')
+      setShowAssignForm(false)
+      setSelectedViolation(null)
+      setSelectedSupervisor('')
 
       await fetchData()
     } catch (error) {
       console.error(error)
-      setError(error.message)
+      setMessage('Failed to create corrective action')
     }
   }
 
   const completeAction = async (id) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/corrective-actions/${id}/complete`,
+        `${API}/corrective-actions/${id}/complete`,
         {
           method: 'PATCH',
           headers: {
@@ -120,357 +155,207 @@ function CorrectiveActions() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          data.message ||
-          'Failed to complete corrective action'
-        )
+        setMessage(data.message || 'Failed to complete action')
+        return
       }
 
+      setMessage('Corrective action marked as Completed')
       await fetchData()
     } catch (error) {
       console.error(error)
-      setError(error.message)
+      setMessage('Failed to complete corrective action')
     }
   }
 
-  const actionViolationIds = new Set(
-    actions.map((action) =>
-      Number(action.violation_id)
-    )
+  const pendingActions = actions.filter(
+    (action) => action.status === 'Pending'
   )
 
-  const availableViolations =
-    violations.filter(
-      (violation) => {
-        const hasFailedReinspection =
-          reinspections.some(
-            (inspection) =>
-              inspection.result === 'Failed' &&
-              Number(
-                inspection.violation_id
-              ) === Number(violation.id)
-          )
-
-        return (
-          violation.status !== 'Resolved' &&
-          !actionViolationIds.has(
-            Number(violation.id)
-          ) &&
-          !hasFailedReinspection
-        )
-      }
-    )
-
-  const pendingCount = actions.filter(
-    (action) => action.status === 'Pending'
-  ).length
-
-  const completedCount = actions.filter(
+  const completedActions = actions.filter(
     (action) => action.status === 'Completed'
-  ).length
+  )
 
-  const failedReinspectionViolations =
-    new Set(
-      reinspections
-        .filter(
-          (inspection) =>
-            inspection.result === 'Failed'
-        )
-        .map((inspection) => ({
-          violationId: Number(
-            inspection.violation_id
-          ),
-          actionId: Number(
-            inspection.corrective_action_id
-          ),
-        }))
+  const violationHasAction = (violationId) =>
+    actions.some(
+      (action) => action.violation_id === violationId
     )
 
-  const failedViolations =
-    violations.filter((violation) => {
-      if (violation.status === 'Resolved') {
-        return false
-      }
+  const failedReinspectionViolationIds = new Set(
+    reinspections
+      .filter((item) => item.result === 'Failed')
+      .map((item) => item.violation_id)
+  )
 
-      const failedInspection =
-        reinspections
-          .filter(
-            (inspection) =>
-              inspection.result === 'Failed' &&
-              Number(
-                inspection.violation_id
-              ) === Number(violation.id)
-          )
-          .sort(
-            (a, b) =>
-              Number(b.id) - Number(a.id)
-          )[0]
+  const violationsRequiringAction = violations.filter(
+    (violation) =>
+      violation.status !== 'Resolved' &&
+      !violationHasAction(violation.id)
+  )
 
-      if (!failedInspection) {
-        return false
-      }
-
-      const oldActionId = Number(
-        failedInspection.corrective_action_id
-      )
-
-      const newActionExists =
-        actions.some(
-          (action) =>
-            Number(action.violation_id) ===
-            Number(violation.id) &&
-            Number(action.id) > oldActionId
-        )
-
-      return !newActionExists
-    })
+  const failedViolationsRequiringAction = violations.filter(
+    (violation) =>
+      failedReinspectionViolationIds.has(violation.id) &&
+      violation.status !== 'Resolved' &&
+      !violationHasAction(violation.id)
+  )
 
   if (loading) {
     return (
-      <div className="text-slate-500">
-        Loading corrective actions...
+      <div className="p-6">
+        <p>Loading corrective actions...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-gray-800">
           Corrective Actions
         </h1>
 
-        <p className="mt-1 text-sm text-slate-500">
-          Track actions required to resolve safety violations
+        <p className="text-sm text-gray-500 mt-1">
+          {isSupervisor
+            ? 'Corrective actions assigned to you'
+            : 'Manage corrective actions and responsible personnel'}
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
+      {message && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+          {message}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <p className="text-sm text-gray-500">
             Total Actions
           </p>
-
-          <p className="mt-2 text-3xl font-bold text-slate-900">
+          <p className="text-3xl font-bold mt-2">
             {actions.length}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <p className="text-sm text-gray-500">
             Pending
           </p>
-
-          <p className="mt-2 text-3xl font-bold text-orange-600">
-            {pendingCount}
+          <p className="text-3xl font-bold text-orange-600 mt-2">
+            {pendingActions.length}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <p className="text-sm text-gray-500">
             Completed
           </p>
-
-          <p className="mt-2 text-3xl font-bold text-green-600">
-            {completedCount}
+          <p className="text-3xl font-bold text-green-600 mt-2">
+            {completedActions.length}
           </p>
         </div>
       </div>
 
-      {failedViolations.length > 0 && (
-        <div className="rounded-xl border border-orange-200 bg-orange-50 p-6">
-          <h2 className="font-semibold text-orange-900">
-            Re-inspection Failed
-          </h2>
-
-          <p className="mt-1 text-sm text-orange-700">
-            Create a new corrective action for the failed violation.
-          </p>
-
-          <div className="mt-5 space-y-3">
-            {failedViolations.map((violation) => (
-              <div
-                key={violation.id}
-                className="flex flex-col gap-4 rounded-lg bg-white p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {violation.violation_code} —{' '}
-                    {violation.type}
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {violation.zone} ·{' '}
-                    {violation.severity}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() =>
-                    createAction(violation)
-                  }
-                  className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
-                >
-                  Create New Action
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {availableViolations.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-          <h2 className="font-semibold text-red-900">
-            Violations Requiring Action
-          </h2>
-
-          <p className="mt-1 text-sm text-red-700">
-            Create a corrective action for an open violation.
-          </p>
-
-          <div className="mt-5 space-y-3">
-            {availableViolations.map((violation) => (
-              <div
-                key={violation.id}
-                className="flex flex-col gap-4 rounded-lg bg-white p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {violation.violation_code} —{' '}
-                    {violation.type}
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {violation.zone} ·{' '}
-                    {violation.severity} ·{' '}
-                    {violation.source}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() =>
-                    createAction(violation)
-                  }
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  Create Action
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-6 py-4">
-          <h2 className="font-semibold text-slate-900">
-            Corrective Action Records
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="px-6 py-4 border-b">
+          <h2 className="font-semibold text-gray-800">
+            {isSupervisor
+              ? 'My Assigned Corrective Actions'
+              : 'All Corrective Actions'}
           </h2>
         </div>
 
         {actions.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">
-            No corrective actions created yet.
+          <div className="p-6 text-gray-500">
+            No corrective actions found.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Action
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Violation
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Zone
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Assigned To
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Deadline
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Status
                   </th>
-
-                  <th className="px-6 py-4">
+                  <th className="text-left px-6 py-3">
                     Update
                   </th>
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className="divide-y">
                 {actions.map((action) => (
-                  <tr
-                    key={action.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-6 py-4 font-medium text-slate-800">
-                      CA-{action.id}
+                  <tr key={action.id}>
+                    <td className="px-6 py-4">
+                      {action.action_description}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-700">
-                      {action.violation_code}
-
-                      <div className="text-xs text-slate-500">
+                    <td className="px-6 py-4">
+                      <div>
                         {action.violation}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {action.violation_code}
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-6 py-4">
                       {action.zone}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-6 py-4">
                       {action.assigned_to}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="px-6 py-4">
                       {action.deadline || '—'}
                     </td>
 
                     <td className="px-6 py-4">
                       <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${action.status ===
-                          'Completed'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-orange-100 text-orange-700'
-                          }`}
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          action.status === 'Completed'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}
                       >
                         {action.status}
                       </span>
                     </td>
 
                     <td className="px-6 py-4">
-                      {action.status === 'Pending' ? (
+                      {isSupervisor &&
+                      action.status !== 'Completed' ? (
                         <button
                           onClick={() =>
-                            completeAction(
-                              action.id
-                            )
+                            completeAction(action.id)
                           }
-                          className="rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700"
+                          className="bg-green-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-green-700"
                         >
                           Mark Completed
                         </button>
+                      ) : action.status === 'Completed' ? (
+                        <span className="text-green-600 text-xs">
+                          Completed
+                        </span>
                       ) : (
-                        <span className="text-xs text-green-600">
-                          Ready for re-inspection
+                        <span className="text-gray-400 text-xs">
+                          Assigned
                         </span>
                       )}
                     </td>
@@ -481,6 +366,179 @@ function CorrectiveActions() {
           </div>
         )}
       </div>
+
+      {canCreate && (
+        <>
+          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="px-6 py-4 border-b">
+              <h2 className="font-semibold text-gray-800">
+                Violations Requiring Action
+              </h2>
+            </div>
+
+            {violationsRequiringAction.length === 0 ? (
+              <div className="p-6 text-gray-500">
+                No violations currently require a corrective action.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {violationsRequiringAction.map((violation) => (
+                  <div
+                    key={violation.id}
+                    className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {violation.type}
+                      </p>
+
+                      <p className="text-sm text-gray-500">
+                        {violation.violation_code} ·{' '}
+                        {violation.zone} ·{' '}
+                        {violation.severity}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        openAssignForm(violation)
+                      }
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                    >
+                      Assign Corrective Action
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {failedViolationsRequiringAction.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="px-6 py-4 border-b">
+                <h2 className="font-semibold text-gray-800">
+                  Re-inspection Failed
+                </h2>
+              </div>
+
+              <div className="divide-y">
+                {failedViolationsRequiringAction.map(
+                  (violation) => (
+                    <div
+                      key={violation.id}
+                      className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          {violation.type}
+                        </p>
+
+                        <p className="text-sm text-gray-500">
+                          {violation.violation_code} ·{' '}
+                          {violation.zone}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          openAssignForm(violation)
+                        }
+                        className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700"
+                      >
+                        Assign New Action
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {showAssignForm && selectedViolation && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">
+                  Assign Corrective Action
+                </h2>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedViolation.type} —{' '}
+                  {selectedViolation.zone}
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowAssignForm(false)
+                  setSelectedViolation(null)
+                  setSelectedSupervisor('')
+                }}
+                className="text-gray-400 hover:text-gray-700 text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Responsible Area Supervisor
+              </label>
+
+              <select
+                value={selectedSupervisor}
+                onChange={(event) =>
+                  setSelectedSupervisor(event.target.value)
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">
+                  Select Area Supervisor
+                </option>
+
+                {supervisors.map((supervisor) => (
+                  <option
+                    key={supervisor.id}
+                    value={supervisor.id}
+                  >
+                    {supervisor.name} — {supervisor.zone}
+                  </option>
+                ))}
+              </select>
+
+              {supervisors.length === 0 && (
+                <p className="text-sm text-red-500 mt-2">
+                  No active Area Supervisor is assigned to this zone.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAssignForm(false)
+                  setSelectedViolation(null)
+                  setSelectedSupervisor('')
+                }}
+                className="px-4 py-2 rounded-lg border text-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={createAction}
+                disabled={!selectedSupervisor}
+                className="bg-blue-600 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg font-medium"
+              >
+                Create & Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

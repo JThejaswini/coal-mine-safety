@@ -26,7 +26,7 @@ const routeRoles = {
 
   '/corrective-actions': [
     'Mine Manager',
-    'Safety Officer',
+    'Safety Officer','Area Supervisor',
   ],
 
   '/reinspections': [
