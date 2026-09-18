@@ -109,7 +109,7 @@ function SafetyMonitoring() {
       if (!response.ok) {
         throw new Error(
           data.message ||
-            'Failed to create violation'
+          'Failed to create violation'
         )
       }
 
@@ -171,7 +171,7 @@ function SafetyMonitoring() {
           if (!response.ok) {
             throw new Error(
               data.message ||
-                'AI detection failed'
+              'AI detection failed'
             )
           }
 
@@ -263,256 +263,483 @@ function SafetyMonitoring() {
     )
   }
 
+  const violationCount = detections.filter(
+    (detection) =>
+      Boolean(
+        VIOLATION_CONFIG[detection.class]
+      )
+  ).length
+
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-sm font-medium text-slate-500">
-          AI Safety System
-        </p>
+    <div className="space-y-7">
 
-        <h1 className="mt-1 text-3xl font-bold text-slate-900">
-          Safety Monitoring
-        </h1>
+      {/* Page introduction */}
+      <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 bg-[#d6a84f]" />
 
-        <p className="mt-2 text-sm text-slate-500">
-          AI-powered CCTV monitoring for PPE compliance
-        </p>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7c857f]">
+              AI safety operations
+            </span>
+          </div>
+
+          <h2 className="mt-3 text-[28px] font-semibold tracking-[-0.03em] text-[#202823]">
+            Live Safety Monitoring
+          </h2>
+
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#737b76]">
+            Monitor the Entry Checkpoint through AI-assisted
+            CCTV analysis and automatically record detected PPE
+            violations.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="border border-[#dfe3de] bg-white px-4 py-2.5">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#8b938e]">
+              Camera
+            </p>
+
+            <p className="mt-1 text-xs font-semibold text-[#303a34]">
+              CCTV 01 · Entry Checkpoint
+            </p>
+          </div>
+
+          <div className="border border-[#dfe3de] bg-white px-4 py-2.5">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#8b938e]">
+              Detection
+            </p>
+
+            <p className="mt-1 text-xs font-semibold text-[#303a34]">
+              {cameraActive
+                ? 'Running'
+                : 'Standby'}
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          {error}
+        <div className="flex items-start gap-3 border border-[#e4caca] bg-[#fff7f7] px-5 py-4">
+          <svg
+            viewBox="0 0 24 24"
+            className="mt-0.5 h-4 w-4 shrink-0 text-[#a33a3a]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v5" />
+            <path d="M12 16h.01" />
+          </svg>
+
+          <p className="text-sm text-[#963d3d]">
+            {error}
+          </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">
-                Live CCTV Feed
-              </h2>
+      {/* Main monitoring area */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.7fr)_380px]">
 
-              <p className="mt-1 text-sm text-slate-500">
-                Entry Checkpoint
+        {/* CCTV */}
+        <section className="border border-[#dfe3de] bg-white">
+
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e5e8e5] px-5 py-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-[#202823]">
+                  Live CCTV Feed
+                </span>
+
+                <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#929a95]">
+                  / Camera 01
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-[#7f8882]">
+                Entry Checkpoint · PPE compliance zone
               </p>
             </div>
 
-            <div
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
-                cameraActive
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-slate-100 text-slate-600'
-              }`}
-            >
+            <div className="flex items-center gap-2">
               <span
-                className={`h-2 w-2 rounded-full ${
-                  cameraActive
-                    ? 'bg-green-500'
-                    : 'bg-slate-400'
-                }`}
+                className={`relative flex h-2 w-2 ${cameraActive
+                    ? 'text-emerald-500'
+                    : 'text-[#9aa19c]'
+                  }`}
+              >
+                {cameraActive && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
+                )}
+
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${cameraActive
+                      ? 'bg-emerald-500'
+                      : 'bg-[#9aa19c]'
+                    }`}
+                />
+              </span>
+
+              <span
+                className={`text-[10px] font-bold uppercase tracking-[0.13em] ${cameraActive
+                    ? 'text-emerald-700'
+                    : 'text-[#7c857f]'
+                  }`}
+              >
+                {cameraActive
+                  ? 'Live'
+                  : 'Offline'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-5">
+            <div className="relative overflow-hidden bg-[#151b18]">
+
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="aspect-video w-full object-cover"
               />
 
-              {cameraActive
-                ? 'LIVE'
-                : 'OFFLINE'}
-            </div>
-          </div>
+              {!cameraActive && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center border border-[#4b554f] bg-[#202823]">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-6 w-6 text-[#d6a84f]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path d="m15 10 4.5-2.5v9L15 14" />
+                        <rect
+                          x="3"
+                          y="6"
+                          width="12"
+                          height="12"
+                          rx="1"
+                        />
+                      </svg>
+                    </div>
 
-          <div className="relative overflow-hidden rounded-xl bg-slate-950">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="aspect-video w-full object-cover"
+                    <p className="mt-4 text-sm font-medium text-white">
+                      CCTV feed offline
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#89928c]">
+                      Start the camera to begin AI analysis
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {cameraActive && (
+                <>
+                  <div className="absolute left-4 top-4 flex items-center gap-2 bg-[#101512]/85 px-3 py-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+                      CCTV 01 · LIVE
+                    </span>
+                  </div>
+
+                  <div className="absolute right-4 top-4 bg-[#101512]/85 px-3 py-2">
+                    <span className="text-[10px] font-medium text-[#d6a84f]">
+                      AI ANALYSIS
+                    </span>
+                  </div>
+
+                  <div className="absolute bottom-4 left-4 bg-[#101512]/85 px-3 py-2">
+                    <span className="text-[10px] text-white">
+                      {status}
+                    </span>
+                  </div>
+
+                  <div className="absolute bottom-4 right-4 bg-[#101512]/85 px-3 py-2">
+                    <span className="text-[10px] text-[#c5cdc7]">
+                      2s analysis interval
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <canvas
+              ref={canvasRef}
+              className="hidden"
             />
 
-            {cameraActive && (
-              <div className="absolute left-4 top-4 rounded-md bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
-                ● CCTV 01
-              </div>
-            )}
+            <div className="mt-5 flex flex-col gap-4 border-t border-[#e5e8e5] pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#8b938e]">
+                  Monitoring status
+                </p>
 
-            {cameraActive && (
-              <div className="absolute bottom-4 left-4 rounded-md bg-black/60 px-3 py-1.5 text-xs text-white">
-                {status}
-              </div>
-            )}
-          </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${cameraActive
+                        ? 'bg-emerald-500'
+                        : 'bg-[#9aa19c]'
+                      }`}
+                  />
 
-          <canvas
-            ref={canvasRef}
-            className="hidden"
-          />
-
-          <div className="mt-5 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-800">
-                Monitoring Status
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                {status}
-              </p>
-            </div>
-
-            {!cameraActive ? (
-              <button
-                onClick={startCamera}
-                className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Start CCTV
-              </button>
-            ) : (
-              <button
-                onClick={stopCamera}
-                className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-              >
-                Stop CCTV
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">
-                AI Detection
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Live PPE analysis
-              </p>
-            </div>
-
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-              AI
-            </span>
-          </div>
-
-          <div className="mt-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Current Detections
-            </p>
-
-            <div className="mt-3 space-y-3">
-              {detections.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-300 p-5 text-center">
-                  <p className="text-sm text-slate-500">
-                    No detections
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-400">
-                    Start CCTV to begin AI analysis
+                  <p className="text-sm font-medium text-[#303a34]">
+                    {status}
                   </p>
                 </div>
+              </div>
+
+              {!cameraActive ? (
+                <button
+                  onClick={startCamera}
+                  className="flex items-center justify-center gap-2 bg-[#202823] px-5 py-3 text-xs font-semibold text-white transition hover:bg-[#2c3730]"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-[#d6a84f]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                  >
+                    <path d="m15 10 4.5-2.5v9L15 14" />
+                    <rect
+                      x="3"
+                      y="6"
+                      width="12"
+                      height="12"
+                      rx="1"
+                    />
+                  </svg>
+
+                  Start CCTV
+                </button>
               ) : (
-                detections.map(
-                  (detection, index) => {
-                    const isViolation =
-                      Boolean(
-                        VIOLATION_CONFIG[
-                          detection.class
-                        ]
-                      )
-
-                    return (
-                      <div
-                        key={`${detection.class}-${index}`}
-                        className={`flex items-center justify-between rounded-lg p-4 ${
-                          isViolation
-                            ? 'border border-red-200 bg-red-50'
-                            : 'border border-slate-200 bg-slate-50'
-                        }`}
-                      >
-                        <div>
-                          <p
-                            className={`text-sm font-semibold ${
-                              isViolation
-                                ? 'text-red-700'
-                                : 'text-slate-700'
-                            }`}
-                          >
-                            {getDetectionLabel(
-                              detection.class
-                            )}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            Confidence
-                          </p>
-                        </div>
-
-                        <span
-                          className={`text-sm font-bold ${
-                            isViolation
-                              ? 'text-red-700'
-                              : 'text-slate-700'
-                          }`}
-                        >
-                          {(
-                            detection.confidence *
-                            100
-                          ).toFixed(0)}
-                          %
-                        </span>
-                      </div>
-                    )
-                  }
-                )
+                <button
+                  onClick={stopCamera}
+                  className="border border-[#d1d7d2] bg-white px-5 py-3 text-xs font-semibold text-[#59635d] transition hover:bg-[#f3f5f2]"
+                >
+                  Stop CCTV
+                </button>
               )}
             </div>
           </div>
+        </section>
 
-          {lastViolation && (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+        {/* Detection panel */}
+        <section className="border border-[#dfe3de] bg-white">
 
-                <p className="text-xs font-bold uppercase tracking-wide text-red-600">
-                  Violation Detected
+          <div className="border-b border-[#e5e8e5] px-5 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#202823]">
+                  AI Detection
+                </p>
+
+                <p className="mt-1 text-xs text-[#7f8882]">
+                  Current frame analysis
                 </p>
               </div>
 
-              <p className="mt-3 text-lg font-bold text-red-800">
-                {lastViolation.type}
-              </p>
+              <div className="flex items-center gap-2 border border-[#e2e5e2] px-2.5 py-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#d6a84f]" />
 
-              <p className="mt-1 text-sm text-red-700">
-                {lastViolation.violation_code}
-              </p>
-
-              <p className="mt-3 text-xs text-red-600">
-                Automatically recorded from AI CCTV
-              </p>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#7c857f]">
+                  Local AI
+                </span>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+
+          <div className="p-5">
+
+            {/* Detection summary */}
+            <div className="grid grid-cols-2 border border-[#e2e6e2]">
+              <div className="border-r border-[#e2e6e2] p-4">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#8c948f]">
+                  Objects
+                </p>
+
+                <p className="mt-2 text-2xl font-semibold text-[#202823]">
+                  {detections.length}
+                </p>
+              </div>
+
+              <div className="p-4">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#8c948f]">
+                  Violations
+                </p>
+
+                <p
+                  className={`mt-2 text-2xl font-semibold ${violationCount > 0
+                      ? 'text-[#a33a3a]'
+                      : 'text-[#202823]'
+                    }`}
+                >
+                  {violationCount}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-[#8c948f]">
+                Current detections
+              </p>
+
+              <div className="mt-3 space-y-2.5">
+                {detections.length === 0 ? (
+                  <div className="border border-dashed border-[#d5dbd6] px-5 py-8 text-center">
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center border border-[#dce1dd]">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 text-[#909892]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <circle cx="12" cy="12" r="8" />
+                        <path d="M8.5 12h7" />
+                      </svg>
+                    </div>
+
+                    <p className="mt-3 text-xs font-medium text-[#59635d]">
+                      No detections
+                    </p>
+
+                    <p className="mt-1 text-[10px] leading-5 text-[#929a95]">
+                      Start CCTV to begin AI analysis
+                    </p>
+                  </div>
+                ) : (
+                  detections.map(
+                    (detection, index) => {
+                      const isViolation =
+                        Boolean(
+                          VIOLATION_CONFIG[
+                          detection.class
+                          ]
+                        )
+
+                      return (
+                        <div
+                          key={`${detection.class}-${index}`}
+                          className={`flex items-center justify-between border px-4 py-3 ${isViolation
+                              ? 'border-[#e5caca] bg-[#fff8f8]'
+                              : 'border-[#e0e4e1] bg-[#f8f9f7]'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`h-2 w-2 rounded-full ${isViolation
+                                  ? 'bg-[#b54848]'
+                                  : 'bg-emerald-500'
+                                }`}
+                            />
+
+                            <div>
+                              <p
+                                className={`text-xs font-semibold ${isViolation
+                                    ? 'text-[#983d3d]'
+                                    : 'text-[#303a34]'
+                                  }`}
+                              >
+                                {getDetectionLabel(
+                                  detection.class
+                                )}
+                              </p>
+
+                              <p className="mt-0.5 text-[10px] text-[#8b938e]">
+                                {isViolation
+                                  ? 'PPE violation'
+                                  : 'Detected object'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-xs font-bold ${isViolation
+                                ? 'text-[#a33a3a]'
+                                : 'text-[#59635d]'
+                              }`}
+                          >
+                            {(
+                              detection.confidence *
+                              100
+                            ).toFixed(0)}
+                            %
+                          </span>
+                        </div>
+                      )
+                    }
+                  )
+                )}
+              </div>
+            </div>
+
+            {lastViolation && (
+              <div className="mt-5 border-l-[3px] border-[#b54848] bg-[#fff7f7] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#a33a3a]">
+                    Violation recorded
+                  </p>
+
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#b54848]" />
+                </div>
+
+                <p className="mt-2 text-base font-semibold text-[#7f3030]">
+                  {lastViolation.type}
+                </p>
+
+                <p className="mt-1 text-[10px] text-[#a15b5b]">
+                  {lastViolation.violation_code}
+                </p>
+
+                <p className="mt-3 text-[10px] leading-4 text-[#a15b5b]">
+                  Automatically recorded from AI CCTV.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* System information */}
+      <section className="border border-[#dfe3de] bg-[#202823]">
+        <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h2 className="font-semibold text-slate-900">
-              Automated Safety Monitoring
-            </h2>
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
 
-            <p className="mt-1 text-sm text-slate-500">
-              CCTV frames are analysed by the local AI service and detected safety violations are automatically recorded.
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#aeb7b0]">
+                Automated safety monitoring
+              </p>
+            </div>
+
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-[#89938c]">
+              CCTV frames are analysed by the local AI service.
+              Detected PPE violations above the confidence
+              threshold are automatically recorded in the safety
+              system.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full bg-green-50 px-4 py-2">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
+          <div className="shrink-0 border border-[#465049] px-4 py-3">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[#7f8982]">
+              Detection engine
+            </p>
 
-            <span className="text-xs font-medium text-green-700">
-              Local AI Service
-            </span>
+            <p className="mt-1 text-xs font-semibold text-[#d6a84f]">
+              Local AI Service · Connected
+            </p>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
